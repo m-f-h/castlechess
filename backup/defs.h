@@ -3,11 +3,14 @@
 */
 #pragma once
 #include <cstdint>
+#include <string>
 #define DEBUG(args) std::cerr<<args;
-// Bit Manipulation Macros
-#define BITTEST(bb, sq) ((bb)>>(sq) & 1)
-#define BITSET(bb, sq)  ((bb) |= (1ULL << (sq)))
-#define BITPOP(bb, sq)  ((bb) &= ~(1ULL << (sq)))
+
+// Colors
+enum Color { WHITE, BLACK, BOTH };
+
+// Pieces (Standard mapping based on your array usage)
+enum Piece { P, N, B, R, Q, K, p, n, b, r, q, k, NONE };
 
 // Squares mapping (A1 = 0 ... H8 = 63)
 enum Square {
@@ -21,13 +24,16 @@ enum Square {
     A8, B8, C8, D8, E8, F8, G8, H8, NO_SQUARE
 };
 
+// Move Extraction Helpers
+inline int get_from(int move) { return move & 0x3F; }
+inline int get_to(int move) { return (move >> 6) & 0x3F; }
+
+// Bit Manipulation Macros
+#define BITTEST(bb, sq) ((bb)>>(sq) & 1)
+#define BITSET(bb, sq)  ((bb) |= (1ULL << (sq)))
+#define BITPOP(bb, sq)  ((bb) &= ~(1ULL << (sq)))
+
 typedef uint64_t Bitboard;
-
-// Colors
-enum Color { WHITE, BLACK, BOTH };
-
-// Pieces (Standard mapping based on your array usage)
-enum Piece { P, N, B, R, Q, K, p, n, b, r, q, k, NONE };
 
 // Castling Rights (Flags)
 enum unsigned long long {
