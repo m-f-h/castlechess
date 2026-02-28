@@ -1,0 +1,26 @@
+Test positions
+
+1. The "Poisoned Capture" Test
+FEN: r3k3/5Q2/7n/8/8/8/8/4K3 b q - 0 1
+
+The Setup: Black is in check. Black can capture the Queen with the King (Kxf7) or the Knight (Nxf7).
+
+Expected Behavior: Nxf7 should be the only viable move. Kxf7 moves the king, clears the q right, and should immediately return a massive negative score (-WIN).
+
+What to Look For: If your engine chooses Kxf7 or scores it as 0 (or +900 for winning a Queen), you know the search is fundamentally failing to trigger the terminal condition upon a capture.
+
+2. The "Forced Blunder" Test (Horizon Effect)
+FEN: r3k3/8/8/8/8/8/8/4K2R w q - 0 1
+
+The Setup: White to move. White can play Rh8+. Black's only legal responses are King moves (Kd7, Ke7), all of which lose the castling right.
+
+Expected Behavior: White should evaluate Rh8+ as +WIN because it forces Black to forfeit the game on the next ply.
+
+What to Look For: If White scores Rh8+ as a standard +50 centipawn advantage (or something similar), your engine cannot see the win over the horizon.
+
+3. The "Instant Win" Test
+FEN: r3k3/8/8/8/8/8/8/4K3 b q - 0 1
+
+The Setup: Black to move. The pathway is clear to play O-O-O.
+
+Expected Behavior: Black should play O-O-O and score it as +WIN.
