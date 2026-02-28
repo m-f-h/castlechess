@@ -20,7 +20,7 @@ namespace Engine {
     /* "LIMITS" */
     extern int max_depth;
     extern int max_time_ms;
-    extern int elapsed_time_ms;
+    extern int elapsed_ms;
 
     // Internal search state
     extern std::chrono::steady_clock::time_point end_time;

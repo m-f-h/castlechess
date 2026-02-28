@@ -70,7 +70,7 @@ bool flipped = false,    // print the board from Black's perspective (rotated 18
     interactive = false,
     msg_queue_enabled = 1;
 int perft_depth = 5;
-int search_depth = 6;
+int search_depth = 8;
 Board board; // Global board instance for command processing
 
 std::vector <std::string> msg_queue; // queue of messages to be printed once we're waiting for user input.
@@ -80,22 +80,24 @@ void ERROR(std::string msg) {
     std::cerr << "ERROR: " << msg << std::endl;
     exit(1);
 }
-void queue_msg(std::string msg) {
-    if (msg_queue_enabled)
-        msg_queue.push_back(msg);
-    else
-        std::cout<<msg;
-}
 void print_msg_queue() {
     for (const auto& msg : msg_queue)
         std::cout << msg;
     msg_queue.clear();
 }
+void queue_msg(std::string msg) {
+    if (msg_queue_enabled)
+        msg_queue.push_back(msg);
+    else {
+        if (msg_queue.size())print_msg_queue();
+        std::cout<<msg;
+    }
+}
 void select_starting_position(const std::string name, const std::string FEN) {
     queue_msg(name + " starting position selected:\n");//. ('d' to display)
-    board.parse_fen(FEN); board.print(flipped); // Q: should we reset flipped to false?
+    board.parse_fen(FEN); 
+    if(interactive) board.print(flipped); // Q: should we reset flipped to false?
 }
-
 void show_move_list(Board& board) {
     MoveList list;
     board.generate_moves(list); Engine::score_moves(list, board);
@@ -123,17 +125,16 @@ void make_engine_move(){
         return;
     }
     std::cout << "Thinking... (depth = " << search_depth << ")\n";
+    Engine::max_depth = search_depth;
     //std::chrono::high_resolution_clock::time_point
-    auto start_time = std::chrono::high_resolution_clock::now();
     Move best_move = Engine::think(board); 
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    
+    int duration = Engine::elapsed_ms;
+
     if (best_move) { // NOTE: must use 'san' *before* making the move !!
         std::cout << "Engine plays the move " << board.numbered_san(best_move)
             <<" (uci: "<<move_to_uci(best_move)<<", eval: "<<Engine::evaluation
-            <<", "<<Engine::nodes_evaluated<<" nodes / "<<duration.count()<<"ms = "
-            <<(duration.count() ? Engine::nodes_evaluated/duration.count() : '-')<<"/ms).\n"
+            <<", "<<Engine::nodes_evaluated<<" nodes / "<<duration<<"ms = "
+            <<(duration ? Engine::nodes_evaluated/duration : '-')<<"/ms).\n"
             <<"Transposition table: used "<<Engine::tt_used<<", stored "<<Engine::tt_stored<<".\n";
         make_move_and_check_termination(best_move);
     } else {
@@ -222,7 +223,7 @@ void parse_args(int argc, char* argv[]) {
                 }
             select_starting_position(std::string(argv[i]), argv[i]); break;
         case 'h': show_help(); break;
-        case 'i': interactive = true; break;
+        case 'i': interactive = true; msg_queue_enabled = false; break;
         case 'k': select_starting_position("Kiwipete", Kiwipete); break;
         case 'm': show_move_list(board); break;            
         case 'p': // perft : expect numerical 'depth' argument after 'p'
@@ -384,7 +385,7 @@ int main(int argc, char* argv[]) {
     if (argc > 1) parse_args(argc, argv);
 
     // if not interactive, the following messages won't be displayed
-    queue_msg("Welcome to Castlechess v.0.9 - (c) 2026 by MFH\nType 'h' for help.\n");
+    queue_msg("Welcome to Castlechess v.2.0 - (c) 2026 by MFH\nType 'h' for help.\n");
     init_tables(); // Initialize any necessary tables (like attack tables, Zobrist keys, etc.)
     if (interactive){
         queue_msg("Engine Initialized.\n");

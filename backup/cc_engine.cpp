@@ -313,10 +313,10 @@ Move think(Board& board) {// think using iterative_deepening
     // if max_time is not set, use 5000 ms
     end_time = start_time + std::chrono::milliseconds(max_time_ms ? max_time_ms : 5000);
 
-    for (int depth = 2; depth <= max_depth; depth++) {
+    for (int depth = 1; depth <= max_depth; depth++) {
         // 2. Do the search for the current depth
         Move best_move_this_depth = search(board, depth);// returns 0 if time was up
-        // we didn't store start_time
+
         elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                     std::chrono::steady_clock::now() - start_time).count();
 
