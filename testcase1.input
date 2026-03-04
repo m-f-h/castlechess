@@ -1,0 +1,10 @@
+{test input for castlechess}
+start {resets the board with standard FEN}
+1. e2e4 d7d5
+2. f1c4 d5c4 
+3. e4e5 f7f5
+4. e5f6 ... {will give 'unknown move' error since e.p. not yet implemented}
+4. g1f3 c8f5 {also illegal: can't capture your own pawn!}
+4... g8f6
+5. e1g1
+x

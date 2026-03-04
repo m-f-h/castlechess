@@ -1,0 +1,193 @@
+Perft results for version 0.9:
+perft 6
+Performing perft with depth = 6...
+a2a3: 4463267
+a2a4: 5363555
+b2b3: 5310358
+b2b4: 5293555
+c2c3: 5417640
+c2c4: 5866666
+d2d3: 8073082
+d2d4: 8879566
+e2e3: 9726018
+e2e4: 9771632
+f2f3: 4404141
+f2f4: 4890429
+g2g3: 5346260
+g2g4: 5239875
+h2h3: 4463070
+h2h4: 5385554
+b1a3: 4856835
+b1c3: 5708064
+g1f3: 5723523
+g1h3: 4877234
+
+Total Nodes: 119060324
+Time taken: 4.13797 seconds
+NPS (Nodes Per Second): 28772663
+==================================
+Perft results for version 0.8:
+
+[give move or command, 'h' for help] 0. start
+[give move or command, 'h' for help] 1. div 3 
+a2a3: 380
+a2a4: 420
+b2b3: 420
+b2b4: 421
+c2c3: 420
+c2c4: 441
+d2d3: 539
+d2d4: 560
+e2e3: 599
+e2e4: 600
+f2f3: 380
+f2f4: 401
+g2g3: 420
+g2g4: 421
+h2h3: 380
+h2h4: 420
+b1a3: 400
+b1c3: 440
+g1f3: 440
+g1h3: 400
+
+Total: 8902
+[give move or command, 'h' for help] 1. div 4   
+a2a3: 8457
+a2a4: 9329
+b2b3: 9345
+b2b4: 9332
+c2c3: 9272
+c2c4: 9744
+d2d3: 11959
+d2d4: 12435
+e2e3: 13134
+e2e4: 13160
+f2f3: 8457
+f2f4: 8929
+g2g3: 9345
+g2g4: 9328
+h2h3: 8457
+h2h4: 9329
+b1a3: 8885
+b1c3: 9757
+g1f3: 9754
+g1h3: 8883
+
+Total: 197291
+
+
+[give move or command, 'h' for help] 1. g1f3
+Move 'g1f3' is 0x546 in hex.
+OK, making move g1f3 (1. Nf3)
+  +-----------------+
+8 | r n b q k b n r |
+7 | p p p p p p p p |
+6 | . . . . . . . . |
+5 | . . . . . . . . |
+4 | . . . . . . . . |
+3 | . . . . . N . . |
+2 | P P P P P P P P |
+1 | R N B Q K B . R |
+  +-----------------+
+    a b c d e f g h
+Move number 1... (Black to move)
+[give move or command, 'h' for help] 1... 
+div 3     | STOCKFISH
+a7a5: 460 | 
+a7a6: 416 | 
+b7b5: 461 | 
+b7b6: 460 | 
+c7c5: 484 | 
+c7c6: 460 | 
+d7d5: 613 | 612
+d7d6: 592 | 519
+e7e5: 657 | 
+e7e6: 656 | 
+f7f5: 440 | 438
+f7f6: 418 | 416
+g7g5: 461 | 
+g7g6: 460 | 
+h7h5: 459 | 
+h7h6: 417
+b8a6: 438
+b8c6: 482
+g8f6: 482
+g8h6: 438
+
+Total: 9754
+
+Stockfish 18 by the Stockfish developers (see AUTHORS file)
+position startpos move g1f3
+go perft 3
+info string Available processors: 0-11
+info string Using 1 thread
+info string NNUE evaluation using nn-c288c895ea92.nnue (125MiB, (102384, 1024, 15, 32, 1))
+info string NNUE evaluation using nn-37f18f62d772.nnue (6MiB, (22528, 128, 15, 32, 1))
+info string Network replica 1: Shared memory.
+a7a6: 416
+b7b6: 460
+c7c6: 460
+d7d6: 591
+e7e6: 656
+f7f6: 416
+g7g6: 460
+h7h6: 417
+a7a5: 460
+b7b5: 461
+c7c5: 484
+d7d5: 612
+e7e5: 657
+f7f5: 438
+g7g5: 461
+h7h5: 459
+b8a6: 438
+b8c6: 482
+g8f6: 482
+g8h6: 438
+
+Nodes searched: 9748
+
+f7f6
+Unknown command: 'f7f6'. Type help for more information.
+move f7f6
+Unknown command: 'move f7f6'. Type help for more information.
+moves f7f6
+Unknown command: 'moves f7f6'. Type help for more information.
+help
+Stockfish is a powerful chess engine for playing and analyzing.
+It is released as free software licensed under the GNU GPLv3 License.
+Stockfish is normally used with a graphical user interface (GUI) and implements
+the Universal Chess Interface (UCI) protocol to communicate with a GUI, an API, etc.
+For any further information, visit https://github.com/official-stockfish/Stockfish#readme
+or read the corresponding README.md and Copying.txt files distributed along with this program.
+
+position startpos moves g1f3 f7f6
+go perft 2
+info string Available processors: 0-11
+info string Using 1 thread
+info string NNUE evaluation using nn-c288c895ea92.nnue (125MiB, (102384, 1024, 15, 32, 1))
+info string NNUE evaluation using nn-37f18f62d772.nnue (6MiB, (22528, 128, 15, 32, 1))
+info string Network replica 1: Shared memory.
+a2a3: 19
+b2b3: 19
+c2c3: 19
+d2d3: 19
+e2e3: 19
+g2g3: 19
+h2h3: 19
+a2a4: 19
+b2b4: 19
+c2c4: 19
+d2d4: 19
+e2e4: 19
+g2g4: 19
+h2h4: 19
+b1a3: 19
+b1c3: 19
+f3g1: 19
+f3d4: 19
+f3h4: 19
+f3e5: 18 * these two N moves threaten f7 so Ke8f7 is no more possible
+f3g5: 18 *
+h1g1: 19
