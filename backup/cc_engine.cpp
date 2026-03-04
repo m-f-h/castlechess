@@ -304,7 +304,7 @@ Move search(Board& board, int depth) {
 
 
 Move think(Board& board) {// think using iterative_deepening
-    Move best_move_overall = 0;
+    Move best_move = 0;
     board.searching = true; // Set searching flag to true for move generation optimizations
     tt_used = tt_stored = nodes_evaluated = 0; // Reset node count for this search
     time_is_up = false;
@@ -313,25 +313,21 @@ Move think(Board& board) {// think using iterative_deepening
     // if max_time is not set, use 5000 ms
     end_time = start_time + std::chrono::milliseconds(max_time_ms ? max_time_ms : 5000);
 
-    for (int depth = 1; depth <= max_depth; depth++) {
-        // 2. Do the search for the current depth
+    for (int depth = 1; depth <= max_depth && !time_is_up; depth++) {
+        // Do the search for the current depth
         Move best_move_this_depth = search(board, depth);// returns 0 if time was up
-
         elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                     std::chrono::steady_clock::now() - start_time).count();
-
         // print UCI info string, => GUI can update. TOTO: add option to disable in interactive mode
         std::cout << "info depth " << depth << " score cp " << evaluation
-                  << " nodes " << nodes_evaluated << " time " << elapsed_ms 
-                  << " pv " << move_to_uci(best_move_overall) // e.g., "e8c8 c4c5 e6d5"
-                  << std::endl;
-
-        if (time_is_up)    // If we finished the depth safely inside the time limit, lock in the move!
-            break;
-        else
-            best_move_overall = best_move_this_depth;
+                  << " nodes " << nodes_evaluated << " time " << elapsed_ms;
+        if(!time_is_up) { // we display the pv (principal variation) only if the search did terminate
+            best_move = best_move_this_depth;
+            std::cout << " pv " << move_to_uci(best_move); // e.g., "e8c8 c4c5 e6d5"
+        }
+        std::cout << std::endl;
     }
     board.searching = false; // Reset searching flag
-    return best_move_overall;
+    return best_move;
 }
 } // end namespace Engine

@@ -781,24 +781,27 @@ static const char* FILES = "    a  b  c  d  e  f  g  h \n";
 static const char* FILES_FLIPPED = "    h  g  f  e  d  c  b  a \n";
 #endif
 //static const char* UNICODE_PIECES = "♙♘♗♖♕♔♟♞♝♜♛♚ □■";
-static const char* UNICODE_PIECES[] = {
-    "♙", "♘", "♗", "♖", "♕", "♔",
-    "♟", "♞", "♝", "♜", "♛", "♚", " ",
-    "□", "■"
+static const wchar_t* UNICODE_PIECES[] = {
+    L"♙ ", L"♘ ", L"♗ ", L"♖ ", L"♕ ", L"♔ ",
+    L"♟ ", L"♞ ", L"♝ ", L"♜ ", L"♛ ", L"♚ ", L"  "//, "□", "■"
 };
-
+#include <windows.h> // for UTF8 output in powershell
+void put_unicode(const wchar_t* s, int len = 0) {
+    DWORD written; if (!len) len = wcslen(s); 
+    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), s, len, &written, nullptr);
+}
 void Board::print(bool flipped) {
     std::cout << HLINE << "\n";
-    for (int rank = 8; rank > 0; ) {
-        std::cout << (flipped ? 8 - --rank : rank--) << " |";
+    for (int rank = 8; rank; ) {
+        std::cout << (flipped ? 9 - rank : rank) << " |"; --rank;
         for (int file = 0; file < 8; file++) {
             int sq = rank * 8 + file;
             Piece piece = mailbox[flipped ? 63 - sq : sq];
             //char symbol = // (piece != NONE) ? PIECE_SYMBOL;
             const char* bg = (rank+file)%2 ? LIGHT : DARK;
             const char* fg = (piece < p ? WHITE_P : BLACK_P);
-            std::cout << bg << fg //<<' '
-                << UNICODE_PIECES[piece] << ' ';
+            std::cout << bg << fg;
+            put_unicode(UNICODE_PIECES[piece]);// std::cout << ' ';
         }
         std::cout <<RESET<< '|' << std::endl;
     }
