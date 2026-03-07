@@ -1,7 +1,114 @@
-/* main.cpp for castlechess - A C++ chess engine
-    (c) 2026 by MFH
+/* main.cpp for CastleChess, (c) 2026 by MFH
 
-    Initial version, with basic UCI command parsing and move making.
+   A C++ chess engine for playing and analysing games & positions of the CasteChess variant.
+*/
+auto CastleChessRules=
+R"(CastleChess rules are the exact same rules as for Standard Chess, 
+except for the additional termination conditions which specify that:
+1) Black wins immediately if they castle *long* (...O-O-O or Ke8-c8)
+  [The move must be legal, though: Neither of e8, d8 or c8 must be attacked by White.]
+2) White wins if Black loses the right to castle long, i.e., if Black's King 
+   or the Rook on a8 moves away from its starting square or gets captured.
+)",
+Description1=R"(
+    The engine can be "plugged into" any UCI compatible GUI (such as Arena, EnCroissant, ...)
+    and the program can also be used interactively, accepting moves in SAN or UCI notation,
+    and allowing to change many settings choices. In particular, you can pipe or paste into
+    the standard input the body of a PGN file including variants (...) and comments {...}.
+
+    Nearly all commands (including moves to make) can be given either as Command Line Arguments
+    or through stardard input. As CLI arg and in interactive mode, they can most often entered
+    as 1- or 2-letter abbreviation using the inital letter(s), see the "help text" for a list.
+)",
+UCI_commands=R"(
+    Supported UCI commands include: (In general they can be abbreviated )
+- "uci": enters UCI mode, disables all output to stdout except for the engine's replies to UCI commands.
+- "isready": answered by "readyok"
+- "go ..." or "g": start the thinking process. Can take additional arguments "position", "moves", "depth"
+   and/or "movetime" or "wtime/btime", "winc/binc", "movestogo" or "infinite" usually sent by UCI (G)UI's.
+   Our program accepts these also independently of the "go" command to set the parameters, 
+   and "go" alone starts the thinking process with current position and depth/time control settings.
+- "position" (ignored): sent by UCI UIs, followed by "fen ..." or "startpos" (or "kiwipete").
+- "startpos" or "s": set up the starting position FEN rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1.
+- "fen" or "f" or "FEN:": followed by a position in FEN, sets up the given position.
+   Without an argument, it prints the FEN of the current position.
+- "moves" (can be omitted): followed by moves in UCI or SAN will make these moves on the board.
+- "depth <N>": set maximum search / thinking depth <N> (alternative: go<N>)
+- "movetime <ms>": set maximum thinking time ("hard limit") to <ms> milliseconds.
+- "movestogo <n>": how many moves until the player(s) get additional time on the clock. (By default, we use n=40.)
+- "wtime / btime <ms>": the total amount of time left for the remaining moves. (=> soft limit <ms>/<n>)
+- "winc / binc <ms>": time increment for each move. (Can be added to soft/hard limit if it's > wtime/btime)
+- "setoption" (optional): followed by "name" and "value". So far only option "Hash" is understood.
+- "name" (optional): name of the option to be set, can be omitted if no ambiguity arises
+- "Hash [value] <size>": set Zobrist Transition Table size to max { 2^k sizeof TTentry <= <size> } MegaByte.
+- "value" (optional): followed by the value we should set the preceding option (name) to.
+- "ucinewgame": clear the Zobrist Transition Table
+
+Additional (non-UCI) commands:
+- "b[ack]": alias for "undo".
+- "d[isplay]": Display the current board state. Activates interactive mode.
+- "e[val]": Evaluate the current position ("depth 0 evaluation")
+- "fl[ip]" or "r[otate]": Flip the board perspective (toggle between White and Black view)
+- 'h[elp]': Show this help message
+- "i" or "interactive" swiches back to more verbose output: display of the position, prompt for input, etc.
+- 'info': toggle output of "engine thinking" (info depth ... score ... pv ...)
+- 'k[iwipete]': alias for FEN r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1, 
+    the Kiwipete position.
+- 'l[og][=<file>]': activate logging to the default file (PATH+"castlechess-debug.log", PATH="c:\temp\" or "/tmp/")
+   or to the specified file. If 'l' is given a second time, or 'l0' or 'l-', logging is disabled.
+- 'ml': Show the list of pseudolegal moves in the current position.
+- 'p[erft] [N]': Run PerfT to depth N (e.g., 'p 5').
+- 're[set]'/'rt'/'tr': Toggle ON/OFF TT reset (clear_tt()) upon restarting a game, i.e., parse_FEN().
+- rules: CastleChess is like normal chess, but Black wins if they castle queenside ...O-O-O# (Ke8-g8)
+   and White wins if Black loses the right to castle queenside (e.g., capture on a8) before they do.)
+- 't': alias for 'movetime': set the move time in milliseconds
+- 'u' or 'undo': Undo the last move.
+- 'v[ersion]': show the VERSION_STRING.
+- 'z': Toggle Zobrist Transposition Table ON/OFF (for testing)
+- '(' or '{': gobble up to matching '}' or ')' to ignore comment {...} or (possibly nested) variation (...).
+   (This allows to read in PGN with side lines and/or comments; the latter can't be nested!)
+)",
+
+Abbreviations = R"(
+Available Commands: (many of these are also command line arguments)
+- 'd[isplay]': Display the current board state. Activates interactive mode.
+- 'depth <N>': set max. search/thinking depth (alternative: go<N>)
+- 'e[val]': Evaluate the current position ("depth 0 evaluation")
+- 'fl[ip]'/'r[otate]': Flip the board perspective (toggle between White and Black view)
+- 'f' or "fen" or "FEN:": show the FEN of the current position, 
+    or reset board from the given FEN string (see also 'k' and 's')
+- 'g' or 'go<N>': Let the engine play the best move it can find, 
+    using the currently set search depth (default = 6); if given, set the depth to <N>.
+    NOTE: g6 is a move ('g7g6') in SAN, therefore obviously not possible instead of go6!
+- 'h[elp]': Show this help message
+- 'Hash value <size>': set the Zobrist Transposition Table size to [max(2^k sizeof TTentry) <= <size> MB.
+- 'i[nteractive]': Choose interactive mode. Allows you to enter moves in SAN or UCI format 
+   (e.g., "Nf3", "dxe5", "e2e4", etc.) and display the board after each move, etc.
+- 'info': toggle output of "engine thinking" (info depth ... score ... pv ...)
+- 'k': Load the Kiwipete position, FEN r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
+- 'l[og][=<file>]': activate logging to the default file (PATH+"castlechess-debug.log", PATH="c:\temp\" or "/tmp/")
+   or to the specified file. If 'l' is given a second time, or 'l0' or 'l-', logging is disabled.
+- 'movetime': set max. thinking time in ms, similar for other UCI commands like 'w/btime', 'w/binc',
+  'moves' (keyword ignored, subsequent moves are read as input), 'movestogo', 
+- 'ml': Show the list of pseudolegal moves in the current position.
+- 'p[erft] [N]': Run perft test to depth N (e.g., 'p 5')
+- 're[set]'/'rt'/'tr': Toggle ON/OFF TT reset (clear_tt()) upon restarting a game, i.e., parse_FEN().
+- rules: CastleChess is like normal chess, but Black wins if they castle queenside ...O-O-O# (Ke8-g8)
+   and White wins if Black loses the right to castle queenside (e.g., capture on a8) before they do.)
+- 'setoption <name> <value>': so far only name="Hash" is implemented
+- 's[tartpos]': Load the standard starting position, FEN rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+- 't': alias for 'movetime': set the move time in milliseconds
+- 'u': Undo the last move.
+- 'uci': Enter UCI mode. In this mode not all commands are recognized.
+- 'v[ersion]': show the VERSION_STRING.
+- 'z': Toggle Zobrist Transposition Table ON/OFF (for testing)
+- '(' or '{': gobble up to matching '}' or ')' to ignore comment {...} or (possibly nested) variation (...).
+   (This allows to read in PGN with side lines and/or comments; the latter can't be nested!)
+You can also enter moves in SAN or UCI format (e.g., Qxe2 or e2e4) once the engine is ready.
+)";
+/*
+    V.1.0 Initial version, with basic UCI command parsing and move making.
+    V.1.1 Zobrist transposition table
 
     Currently, the program starts in non-interactive mode (use cmd line option 'i' to change this)
     and remains silent waiting for the GUI's "uci" command.
@@ -36,6 +143,9 @@ TODO:
     c) UCI style communication / command parsing
     d) UI for interactive use: board.print() doesn't really belong to the engine part. (Is it a problem?)
 
+- implement UCI command 'setoption', in particular
+    * name Hash value 128 (meaning 128 MB of TT table -- note, each entry is ~ 25 byte:
+        12 piece Bitboards x 4).
 
 History:
 2026-02-17..19: quite efficient version (30M nodes/sec) created on GitHub code space.
@@ -44,15 +154,27 @@ History:
 2026-02-21: implemented PerfT.
 2026-02-25:
 - added Zobrist hashing and a simple Transposition Table (TT) implementation
-2026-02-26:
+2026-02-26: V.1.0 
 - added ANSI color codes for better readable output in the terminal
 - added UFT8 output for Unicode chess pieces. Unfortunately, the terminal switches fg color to opposite
   depending on BG color (light vs. dark squares), only green dark squares seem to work reasonably.
 - added Zobrist best_move to move sorting
 - added UCI communication. Tested to work with EnCroissant.
 
-2026-02-27: added iterative deepening (to improve move ordering and time management) DONE
-2026-03-03: added Unicode/UTF8 fix for PowerShell in board.cpp:Board.print()
+2026-02-27: V.1.1 added iterative deepening (to improve move ordering and time management) DONE
+2026-03-03: V.1.2 added Unicode/UTF8 fix for PowerShell in board.cpp:Board.print()
+2026-03-04: added timing in Board::perft_divide()
+- added "b", "back", "takeback" aliases for 'u' = "undo"
+- changed TT_SIZE to 8x larger. Changed from array to vector. added resize_tt.
+For the records: with TT_SIZE = 1<<20 :
+Engine plays the move 8. b4 (uci: b2b4, eval: 350, 10011973 nodes / 2594ms = 3859/ms).
+Engine plays the move 8... Bc6 (uci: b7c6, eval: -300, 9398170 nodes / 2462ms = 3817/ms).       
+Transposition table: used 606283, stored 2035178.
+with TT_SIZE = 8<<20 :
+Engine plays the move 2. Nf3 (uci: g1f3, eval: 500, 19541440 nodes / 4645ms = 4206/ms).
+Transposition table: used 676744, stored 3087491.
+2026-03-05: added "setoption" -> Hash -> resize_tt 
+2026-03-06: (re)added "gobble logic" to ignore {...} and nested (...) in input
 */
 #include <iostream>
 #include <chrono>
@@ -73,6 +195,7 @@ void show_help() {
     std::cout << WELCOME_MESSAGE << R"(
 Available Commands: (many of these are also command line arguments)
 - 'd[isplay]': Display the current board state. Activates interactive mode.
+- 'depth <N>': set max. search/thinking depth (alternative: go<N>)
 - 'e[val]': Evaluate the current position ("depth 0 evaluation")
 - 'fl[ip]'/'r[otate]': Flip the board perspective (toggle between White and Black view)
 - 'f' or "fen" or "FEN:": show the FEN of the current position, 
@@ -81,24 +204,32 @@ Available Commands: (many of these are also command line arguments)
     using the currently set search depth (default = 6); if given, set the depth to <N>.
     NOTE: g6 is a move ('g7g6') in SAN, therefore obviously not possible instead of go6!
 - 'h[elp]': Show this help message
+- 'Hash value <size>': set the Zobrist Transposition Table size to [max(2^k sizeof TTentry) <= <size> MB.
 - 'i[nteractive]': Choose interactive mode. Allows you to enter moves in SAN or UCI format 
    (e.g., "Nf3", "dxe5", "e2e4", etc.) and display the board after each move, etc.
+- 'info': toggle output of "engine thinking" (info depth ... score ... pv ...)
 - 'k': Load the Kiwipete position, FEN r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
 - 'l[og][=<file>]': activate logging to the default file (PATH+"castlechess-debug.log", PATH="c:\temp\" or "/tmp/")
-   or to the specified file. If 'l' is given a second time, or 'l0' or 'l-', logging is disabled.  
+   or to the specified file. If 'l' is given a second time, or 'l0' or 'l-', logging is disabled.
+- 'movetime': set max. thinking time in ms, similar for other UCI commands like 'w/btime', 'w/binc',
+  'moves' (keyword ignored, subsequent moves are read as input), 'movestogo', 
 - 'ml': Show the list of pseudolegal moves in the current position.
 - 'p[erft] [N]': Run perft test to depth N (e.g., 'p 5')
 - 're[set]'/'rt'/'tr': Toggle ON/OFF TT reset (clear_tt()) upon restarting a game, i.e., parse_FEN().
 - rules: CastleChess is like normal chess, but Black wins if they castle queenside ...O-O-O# (Ke8-g8)
    and White wins if Black loses the right to castle queenside (e.g., capture on a8) before they do.)
-- 's': Load the standard starting position, FEN rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-- 't': set the move time in milliseconds
+- 'setoption <name> <value>': so far only name="Hash" is implemented
+- 's[tartpos]': Load the standard starting position, FEN rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+- 't': alias for 'movetime': set the move time in milliseconds
 - 'u': Undo the last move.
 - 'uci': Enter UCI mode. In this mode not all commands are recognized.
 - 'v[ersion]': show the VERSION_STRING.
 - 'z': Toggle Zobrist Transposition Table ON/OFF (for testing)
-You can also enter moves in UCI format (e.g., 'e2e4') once the engine is ready.
+- '(' or '{': gobble up to matching '}' or ')' to ignore comment {...} or (possibly nested) variation (...).
+   (This allows to read in PGN with side lines and/or comments; the latter can't be nested!)
+You can also enter moves in SAN or UCI format (e.g., Qxe2 or e2e4) once the engine is ready.
 )";
+
 }
 
 //const std::string STANDARD_FEN; // = FEN of standard starting position, defined in board.h
@@ -258,7 +389,12 @@ Move identify_move(std::string cmd) {
         }
     return 0; // not found
 }
-void try_to_make_move(std::string cmd){ // Attempt to parse string as a move and execute it if pseudolegal
+// Attempt to parse string as a move and execute it if pseudolegal
+// If the string starts with a digit, that could be the move number, to be ignored.
+void try_to_make_move(std::string cmd){
+    // skip & ignore digits & punctuation (like move numbers)
+    while(cmd.size() && std::toupper(cmd[0])<'A') cmd = cmd.substr(1);
+    if (cmd.empty()) return;
     if (Move m = identify_move(cmd)) {
         // NOTE: this must come *before* making the move, since 'san' needs the *current* board state to identify the move correctly.
         if (interactive)
@@ -336,6 +472,7 @@ void parse_args(int argc, char* argv[]) {
                 ERROR("Invalid depth provided: must be > 0.");
             board.perft_divide(perft_depth);
             break;
+        case 'q': case 'x': exit(1);            
         case 's': select_starting_position("Standard", STANDARD_FEN); break;            
         case 'u': /* 'undo' or enter UCI mode (if history is empty or 'uci' is given)*/
             if (history.empty()|| argv[i][1]=='c') interactive=false;
@@ -351,21 +488,125 @@ void not_yet_implemented(std::string cmd){
     if (log) *log<<"ENG -> ignoring '"<<cmd<<"' - not yet implemented\n";
 }
 
+// standard time management / allocation formula
+/* more elaborate time management, to be used ***within the iterative deepening***
+int time_for_prev_depth = 1; // avoid divide by zero
+for (int depth = 1; depth <= max_depth; depth++) {
+    auto start_of_depth = std::chrono::steady_clock::now();
+    // ... run the search ...
+    auto end_of_depth = std::chrono::steady_clock::now();
+    int time_for_this_depth = std::chrono::duration_cast<std::chrono::milliseconds>(end_of_depth - start_of_depth).count();
+
+    // Calculate branching factor (e.g., if depth 8 took 500ms and depth 7 took 100ms, factor is 5)
+    int branching_factor = time_for_this_depth / time_for_prev_depth;
+    if (branching_factor < 2) branching_factor = 2; // safety net
+    
+    int estimated_next_time = time_for_this_depth * branching_factor;
+    int total_time_spent = ...; // total time since think() started
+    
+    // If the next depth is going to blow past our soft limit, stop now!
+    if (total_time_spent + estimated_next_time > soft_limit_ms) {
+        break; // lock in the current move and save our clock time!
+    }
+    time_for_prev_depth = time_for_this_depth;
+}*/
+int allocate_time(int time_left_ms, int increment_ms, int movestogo = 0) {
+    // 1. Basic safe budget: allocate 1/movestogo of our remaining time.
+    // If we didn't get movestogo, use 40.
+    // If we got movestogo < 2 (i.e., 1), use 2.
+    if (movestogo < 2) movestogo = movestogo ? 40 : 2; 
+    int budget = time_left_ms / (movestogo > 1 ? movestogo : movestogo ? 2 : 40);
+    
+    // 2. Add the increment (minus a tiny safety margin for network/GUI lag)
+    budget += increment_ms - 50; 
+    
+    // 3. Absolute floor: never allocate less than 50ms, or we might crash/blunder
+    if (budget < 50) budget = 50;
+    
+    // 4. Absolute ceiling: never use more than 80% of our total remaining time on one move
+    if (budget > time_left_ms * 0.8) budget = time_left_ms * 0.8;
+    
+    return budget;
+}
+
+int find_next_unescaped(char c, const std::string& cmd) {
+    int pos = cmd.find(c);
+    while ( pos != std::string::npos && pos && cmd[pos-1] == '\\' ) {// skip if escaped
+        pos = cmd.find(c, pos+1);
+    }
+    return pos; // possibly npos
+}
+std::string gobble; // keep track of comments "{...}" or (nested) variants "(...)"
+/* Check whether cmd is to be gobbled.
+ * Returns true if (what remains of) cmd should be ignored.
+ * This may remove an initial segment of cmd if there's a '}' somewhere in the middle.
+ */
+bool gobbled(std::string& cmd){
+    for(;;) {
+        while((gobble.empty() or gobble.back() != '}') // while we're NOT within a comment {...}
+             and (cmd[0] == '(' or cmd[0] == '{')) { // we can nest variations (...) or start a {...}
+            // Otherwise we ignore everything up to the next '}' : see below.
+            // TODO: implement search for '(' or '{' within the *interior* of cmd!
+            gobble.push_back(cmd[0]=='(' ? ')' : '}');
+            if (cmd.size() == 1) return 1; // Nothing left. 
+            cmd = cmd.substr(1);            
+            // If we're now in a {...} or (...), scan the remainder for '}' or ')' !
+        }
+        if (gobble.empty()) return 0; // if nothing to gobble (a fortiori, no leading '(' or '{')
+                // => go on parsing the command normally
+        int pos = find_next_unescaped(gobble.back(), cmd);
+        if (pos == std::string::npos) return 0; // no matching '}' or ')' => go on parsing
+        // found the matching, unescaped ')' or '}'.
+        gobble.pop_back();  // remove that "gobble flag"
+        if (pos+1 == cmd.size()) return 1; // or: !cmd[pos+1] : end of cmd reached
+        cmd = cmd.substr(pos+1); // remove everything up to and including this '}' or ')'
+        // check whether the remainder starts with { or (.
+    }
+}
+void parse_Hash(std::istream& iss){
+    // auto pos = iss.tellg(); 
+    std::string arg;
+    if (!(iss>>arg && (std::isdigit(arg[0]) 
+                    || arg == "value" && iss>>arg && std::isdigit(arg[0])))) {  
+        std::cerr<<"Expected a numerical value as argument after 'Hash', got '"<<arg<<"'!\n";
+        return;
+    }
+    int value = std::atoi(&arg[0]);
+    if (value < 8){
+        std::cerr<<"A value of "<< value <<" is too small for 'setoption Hash'.\n";
+    } else Engine::resize_hash_table(value);
+}
+void parse_setoption(std::istream& iss) {
+            std::string nxt, name; int value;
+            if(!(iss>>nxt>>name) || nxt != "name"){
+                std::cerr<<"Expected 'setoption' to be followed by 'name', but got "
+                    << (nxt.empty() ? "nothing" : '\''+nxt+'\'') << ".\n";
+            }// todo: we might allow to drop "name" ?
+            else if(!(iss>>value)){
+                std::cerr<<"Expected a numerical value after 'setoption "<<name<<"'.\n";
+            }
+            else if(name=="Hash") parse_Hash(iss); 
+            else std::cerr<<"Option '"<< name <<"' not yet implemented / recognized.\n";
+}
 /* read & parse one line of input. return 0 if program should quit. */
-int read_and_parse_command(std::istream* input){
-    std::string line, cmd; std::getline(*input, line); 
-    if (line.empty()) return 1; // shouldn't happen?
+int read_and_parse_command(std::istream& input){
+    std::string line, cmd; std::getline(input, line); 
+    if (line.empty()) { 
+        std::cerr<<"WARNING: Empty input line: this shouldn't happen!\n"; 
+        return 1;
+    } 
     if (log) *log << "GUI -> " << line << std::endl;// LOG THE INCOMING COMMAND
-    std::istringstream iss(line);
-    bool parsing_go_arguments = false; // will be set TRUE if 'go' is given but we have to read further args
+    std::istringstream iss(line); // read words from the input line
+    std::string parsing_arguments; // will be set to "go" or "Hash" or others if we have to read further args
+        //... and can complete the command only later (once the full line was read)
     while(iss >> cmd) { // read from (this!) input until exhausted
-        //if (log) *log << "GUI -> " << cmd << std::endl;// LOG THE INCOMING COMMAND
+        if(gobbled(cmd)) continue; // returns true if (remaining) cmd was or should be entirely gobbled
         // We must check for exact matches or unambiguous prefixes.
         // e.g., 'd2d4' starts with 'd' like "display", "perft" starts with 'p' like "print"
         if (cmd == "d" || cmd.substr(0,2) == "di" || cmd.substr(0,2) == "pr") {
             enable_interactive(); board.print(flipped); 
         }
-        else if (cmd == "depth"){
+        else if (cmd == "depth"){ // in UCI mode, given after 'go'
             if (!(iss >> search_depth))
                 std::cerr << "Expected numerical value for depth after 'go depth ...'.\n";
             else
@@ -391,8 +632,7 @@ int read_and_parse_command(std::istream* input){
                 // So, in this case *nothing* should follow the 'fen' command
                 // This should only happen in interacive, not in UCI mode.
                 if (fen_end > fen_pos)
-                    std::cerr<<"WARNING: Ignoring '"<<line.substr(fen_pos, fen_end - fen_pos)
-                            <<"' following the 'fen' command.\n";
+                    std::cerr<<"WARNING: Ignoring '" << FEN << "' following the 'fen' command.\n";
                 std::cout << "FEN of the current position:\n" << board.fen() << std::endl;
                 continue;
             }
@@ -402,8 +642,8 @@ int read_and_parse_command(std::istream* input){
                 board.parse_fen(FEN);
             }
         }
-        else if (cmd[0]=='g' && (cmd[1]==0 || cmd[1]=='o' && (
-                                 cmd[2]==0 || std::isdigit(cmd[2]) ))) { // GO !
+        else if (cmd[0]=='g' && (cmd[1]==0 || cmd[1]=='o' && ( // GO !
+                                 cmd[2]==0 || std::isdigit(cmd[2]) ))) {
             // The user or the GUI tells us to start thinking.
             // The user may type just 'g' or 'go', or 'go6' for depth=6 
             // The GUI may say: go depth 8
@@ -444,16 +684,19 @@ These are not part of UCI itself; they vary by engine.
             if (cmd.size()>2) // we already checked that next arg is numeric
                 search_depth = std::atoi(&cmd[2]); // user might *want* depth = 0 ...
             //Engine::max_time_ms = 0; // default: no time limit (engine may change this to a reasonable upper limit)
-            parsing_go_arguments = true;
+            parsing_arguments = "go";
                 // We might allow for a numerical arg. to be given as search depth
                 //read_and_parse_command(cmd);
                 // parse remaining args like 'depth', 'movetime' etc
         } 
         else if (cmd == "h" || cmd == "help" || cmd == "?") {
+            if (cmd[0]=='?' && line[0] != '?') continue; // don't show help if not at beg. of line:
+                                            // we suspect the '?' is an annotation following a move
             show_help();
             if(!interactive)
                 std::cout<<"Currently in UCI mode. Type 'i' to enter interactive mode.\n";
         }
+        else if(cmd == "Hash") parse_Hash(iss);
         else if (cmd == "infinite") not_yet_implemented(cmd);
         else if (cmd == "isready") {// UCI: are we done initializing?
             std::cout << "readyok" << std::endl;   // yes!
@@ -477,8 +720,10 @@ These are not part of UCI itself; they vary by engine.
             }
             if (cmd.size() == 4) { // winc/binc
                 // For simplicity, we add the increment to the time limit for this move.
+                // (Time limit computed when we received wtime, hopefully earlier)
                 // TODO: we should check whether we have enough total time left!
-                Engine::max_time_ms += time_limit_ms;
+                Engine::max_time_ms += time_limit_ms - 50; // remove 50ms for lag
+
                 continue;
             }
             if (cmd.size() == 5) { // wtime or btime 
@@ -530,10 +775,13 @@ These are not part of UCI itself; they vary by engine.
             toggle_reset_tt();// reset/clear the TT upon starting a new game (parse_fen) 
         else if (cmd[0] == 'r' && (cmd[1]==0 || cmd[1]=='o'))// || cmd == "rot" || cmd == "rotate") 
             flip_board();
-        else if (cmd == "s" || cmd.substr(0,3) == "sta") { // incl. UCI (command == "startpos")
+        else if (cmd[0] == 's' && (cmd[1]==0 || cmd[1]=='t')) {
+            // s, std, start, ... incl. UCI command == "startpos"
             if (interactive) select_starting_position("Standard", STANDARD_FEN);
             else board.parse_fen(); 
         }
+        else if (cmd[0] == 's' && cmd[1]=='e') parse_setoption(iss); // set[option]
+        else if (cmd[0] == 't' || cmd[0] == 'z') toggle_tt();  // use/don't use Zobrist TT
         else if (cmd == "uci") { // The GUI says hello. We reply with our info and "uciok"
             if(interactive){
                 std::cerr<<"Entering non-interactive UCI mode. ('i' to switch back.)\n";
@@ -549,19 +797,30 @@ These are not part of UCI itself; they vary by engine.
             if (log) *log << "ENG -> cleared transposition table; set reset_tt = false" << std::endl;
         } 
         else if (cmd == "ucinewgame") { // New game is starting. We should clear the TT.
-            clear_tt(); // board.parse_fen(); //STANDARD_FEN // only later, upon "position startpos".
+            Engine::clear_tt(); // board.parse_fen(); //STANDARD_FEN // only later, upon "position startpos".
         }
-        else if (cmd[0] == 'u') undo_move();
+        else if (cmd[0] == 'u' || cmd=="b" || cmd=="back" || cmd=="takeback") undo_move();
         // SUBJECT TO CHANGE : we may want "t" for "time".
-        else if (cmd[0] == 't' || cmd[0] == 'z') toggle_tt();  // use/don't use Zobrist TT
+        else if (cmd[0] == 'v' && cmd[1] == 'a') { // value (after setoption name ...)
+            if (parsing_arguments.empty()) {
+                std::cerr<<"'value' should be preceded by the name of the option.\n";
+            }
+        }
         else if (cmd[0] == 'v') // version
             std::cout<<"You are playing "<<VERSION_STRING<<"\nHave fun!\n";
+        else if (std::toupper(cmd[0])<'A') { // digits or punctuation e.g. for annotations like #, !, ?, ...
+            // move number (to be ignored) or awaited numerical value
+            // for now, simply ignore numerical values
+            while(cmd.size() && std::toupper(cmd[0])<'A') cmd=cmd.substr(1);
+            if (cmd.size()) try_to_make_move(cmd);
+        }
         else try_to_make_move(cmd); // Attempt to parse input as a move
-    }
+    }// end while (iss>>cmd)
     // input line is exhausted.
-    if (parsing_go_arguments) make_engine_move();
+    if (parsing_arguments == "go") make_engine_move();
     return 1; // don't quit
 }
+
 int main(int argc, char* argv[]) {
     // Write this to stderr, not stdout : the chess GUI would be confused by this,
     // but a user should know how they can switch to interactive mode.
@@ -572,16 +831,17 @@ int main(int argc, char* argv[]) {
     if (argc > 1) parse_args(argc, argv);
     if (interactive){
         queue_msg("Engine Initialized.\n");// this actually empties the msg queue
-        select_starting_position("Standard", STANDARD_FEN);
+        if(!board.occupancy[BOTH]) // board is empty
+            select_starting_position("Standard", STANDARD_FEN);
     } else {
         std::cerr << "Now in UCI mode, type 'i' to enter interactive mode.\n";
     }        
-    do {
+    do { // Here goes the main REPL
         if (interactive) {
-            print_msg_queue();
+            print_msg_queue(); // empty msg queue, if any. // Prompt = move number, e.g. "1... "
             std::cout << "Your move or command, 'h' for help: "<<board.move_number_string();
         }
-    } while (read_and_parse_command(&std::cin));
+    } while (read_and_parse_command(std::cin));
 
     queue_msg("Bye!\n");
     print_msg_queue();

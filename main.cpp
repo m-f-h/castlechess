@@ -13,7 +13,7 @@
 #include <cctype> // Needed for isupper() and tolower()
 #include <vector> //  for move stack 'history'
 #include <chrono> // for timing the perft
-#include <fmt/core.h>
+//#include <fmt/core.h> // no more needed, and not found on many systems
 #include "board.h"
 
 void showHelp() {

@@ -48,11 +48,15 @@ uint64_t Board::generate_hash() {// compute zobrist hash
     if (enPassantSquare != NO_SQUARE) { // Or however you represent "no EP square"
         h ^= zobrist_ep[enPassantSquare]; // XOR the file index of the EP square
     }
-    // 4. Castling Rights (checking your specific bits)
-    if (BITTEST(castling_rights, 0))  h ^= zobrist_castling[0]; // A1
-    if (BITTEST(castling_rights, 7))  h ^= zobrist_castling[1]; // H1
-    if (BITTEST(castling_rights, 56)) h ^= zobrist_castling[2]; // A8
-    if (BITTEST(castling_rights, 63)) h ^= zobrist_castling[3]; // H8
+    // 4. Castling Rights (checking specific bits)
+    if (castling_rights & WHITE_O_O_O) //BITTEST(castling_rights, 0))  
+        h ^= zobrist_castling[0]; // A1
+    if (castling_rights & WHITE_O_O) //BITTEST(castling_rights, 7))  
+        h ^= zobrist_castling[1]; // H1
+    if (castling_rights & BLACK_O_O_O) //BITTEST(castling_rights, 56))
+        h ^= zobrist_castling[2]; // A8
+    if (castling_rights & BLACK_O_O) //BITTEST(castling_rights, 63))
+        h ^= zobrist_castling[3]; // H8
     return h;
 }
 
@@ -655,7 +659,7 @@ void Board::reset(){
     fullmove_number = 1;
     side = WHITE; searching = false;
     for(int i=0; i<64; i++) mailbox[i] = NONE; // empty board. use parse_fen to set up the standard position.
-    if (Engine::reset_tt) clear_tt();
+    if (Engine::reset_tt) Engine::clear_tt();
 }
 
 void Board::update_occupancy(){
@@ -808,10 +812,10 @@ void Board::print(bool flipped) {
     std::cout << HLINE << '\n' << (flipped ? FILES_FLIPPED : FILES);
 }
 
+/* Perft to depth `depth`. Returns number of nodes visited. */
 uint64_t Board::perft(int depth) {
     MoveList list;
     generate_moves(list);
-
     uint64_t nodes = 0;
     
     //Color us = side;
@@ -820,10 +824,8 @@ uint64_t Board::perft(int depth) {
     for (int i = 0; i < list.count; i++) {
         Move move = list.moves[i];
         // --- STATE SAVING ---
+        // backup of the "old" board position & state (castling rights, EP square, etc.)
         Board board = *this;
-
-        // We need a backup of engine state (castling rights, EP square, etc.)
-        // depending on how your unmake_move is structured.
         
         board.make_move(move);
 
@@ -846,7 +848,7 @@ void Board::perft_divide(int depth) {
 
     uint64_t total_nodes = 0;
     std::cout << "--- Perft Divide Depth " << depth << " ---" << std::endl;
-   
+    auto start_time = std::chrono::steady_clock::now();
     for (int i = 0; i < list.count; i++) {
         Move move = list.moves[i];
         Board copy = *this; // Make a copy of the board to test the move
@@ -860,7 +862,11 @@ void Board::perft_divide(int depth) {
             total_nodes += nodes;
         }
     }
-    std::cout << "\nTotal Nodes: " << total_nodes << std::endl;
+    std::chrono::duration<double> //milliseconds 
+        elapsed = std::chrono::steady_clock::now() - start_time;
+    std::cout << "\nTotal Nodes: " << total_nodes
+        << "\nTime: " << elapsed.count()*1000 << " ms => "
+        << total_nodes/elapsed.count()/1000 << " nodes/ms" << std::endl;
 }
 // end perft_divide
 

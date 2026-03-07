@@ -6,9 +6,36 @@
 #pragma once
 #include "defs.h"
 #include "board.h"
+#include <vector>
 #define ZOBRIST_DEBUG 0
 
+// Transposition Table Flags
+enum TTFlag {
+    TT_EXACT,       // We searched all moves and found the exact score
+    TT_ALPHA,       // Upper bound (all moves failed low, score is <= this)
+    TT_BETA         // Lower bound (a move caused a beta cutoff, score is >= this)
+};
+
+struct TTEntry { // size = 8 + 4 + (1+1+2) = 16
+    uint64_t key;       // The Zobrist hash (to resolve collisions)
+    // next 32 bits are shared b/w score & flags
+    int32_t score :24;          // The evaluation score
+    uint32_t flag :8;           // EXACT, ALPHA, or BETA [2 bits would suffice]
+    Move best_move;     // The best move found (crucial for move ordering!)
+    uint8_t depth;     // How deep we searched to get this score
+    uint8_t epoch;  // to estimate the "age"/ whether position / TT entry became obsolete
+};
 namespace Engine {
+/***** Zobrist Transition Table stuff *****/
+    const int TT_SIZE = 8 << 20; // ~ 8 Million entries (approx. 128 MB of RAM)
+    extern std::vector<TTEntry> TT; //[TT_SIZE]; //  allocated in engine.cpp
+
+// Clear the hash / transition table before a new game (upon "ucinewgame")
+    void clear_tt();
+// Resize the hash table before a new game (upon "setoption name Hash...")
+    void resize_hash_table(int megabytes);
+/***** end Zobrist Transition Table stuff *****/
+
     const int INFINITY_SCORE = 50000;
     const int CHECKMATE_SCORE = 40000;
     const int CASTLE_WIN_SCORE = 30000;
@@ -30,26 +57,5 @@ namespace Engine {
     int negamax(Board& board, int depth, int alpha, int beta);
     Move search(Board& board, int depth);    // "root search"
     Move think(Board& board);    // main incremental search function
-
-//    void clear_tt();// Clear the table before a new game
 }// end namespace Engine
 
-// Transposition Table Flags
-enum TTFlag {
-    TT_EXACT,       // We searched all moves and found the exact score
-    TT_ALPHA,       // Upper bound (all moves failed low, score is <= this)
-    TT_BETA         // Lower bound (a move caused a beta cutoff, score is >= this)
-};
-
-struct TTEntry {
-    uint64_t key;       // The Zobrist hash (to resolve collisions)
-    int score;          // The evaluation score
-    int depth;          // How deep we searched to get this score
-    int flag;           // EXACT, ALPHA, or BETA
-    Move best_move;     // The best move found (crucial for move ordering!)
-};
-const int TT_SIZE = 1024 * 1024; // ~1 Million entries (approx 25MB of RAM)
-extern TTEntry TT[TT_SIZE];
-
-// Clear the table before a new game
-extern void clear_tt();
